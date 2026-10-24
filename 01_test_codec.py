@@ -2,12 +2,13 @@ import torch
 import numpy as np
 from scipy.io import wavfile
 from transformers import EncodecModel, AutoProcessor
-from synth import make_chord_audio
+from utils.synth import make_chord_audio
+from tangents.plot_compare import plot_comparison
 
 print("Loading Encodec model...")
 model_id = "facebook/encodec_32khz"
 processor = AutoProcessor.from_pretrained(model_id)
-codec = EncodecModel.from_pretrained(model_id)
+codec = EncodecModel.from_pretrained(model_id).to("cuda")
 
 
 sr = processor.sampling_rate
@@ -25,17 +26,20 @@ with torch.no_grad():
 
 print("After codec")
 print("Tokens tensor shape:", tokens.shape)
-print("First 5 time steps across all 4 dictionnaries:", tokens[0, :5, :])
+print("First 5 time steps across all 4 dictionnaries:", tokens[0, 0, :, :5])
+
+
+with torch.no_grad():
+    decoded_audio = codec.decode(tokens, encoded.audio_scales).audio_values
+    decoded_np = decoded_audio[0,0].cpu().numpy()
 
 print("After decoding")
 print("Decoded audio shape:", decoded_audio.shape)
-
-with torch.no_grad():
-    decoded = codec.decode(tokens, encoded.audio_scales).audio_values
-    decoded_np = decoded_audio[0,0].cpu().numpy()
     
 wavfile.write("original.wav", sr, raw_audio)
 wavfile.write("decoded.wav", sr, decoded_np)
 
-print("Done! Check original.wav and decoded.wav")    
+print("Done! Check original.wav and decoded.wav")
+
+plot_comparison(raw_audio, decoded_np, sr)
     
